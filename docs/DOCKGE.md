@@ -18,6 +18,9 @@ into Dockge's environment editor and replace the passwords/tokens.
 Required values:
 
 ```text
+STOREPATH=/mnt/store
+DOCKER_NETWORK=media_bridge
+
 INFLUXDB_USERNAME=admin
 INFLUXDB_PASSWORD=change-this
 INFLUXDB_ORG=home
@@ -58,10 +61,33 @@ ip route get 1.1.1.1
 
 The interface shown after `dev` in the route command is usually the right one.
 
-Keep `config/devices.csv` beside the compose file if you want friendly names.
+The compose file follows the same Dockge pattern as your other services:
+
+- `env_file: .env`
+- Watchtower label enabled
+- persistent files under `${STOREPATH}/DockerStuff/home-net-observer`
+- non-host services attached to external network `${DOCKER_NETWORK}`
+
+Make sure the external Docker network exists:
+
+```bash
+docker network ls | grep media_bridge
+```
+
+If needed:
+
+```bash
+docker network create media_bridge
+```
+
+Keep your device labels at:
+
+```text
+${STOREPATH}/DockerStuff/home-net-observer/config/devices.csv
+```
 
 If you are deploying from Git, copy your private local `config/devices.csv` to
-the home server after cloning. Do not commit it.
+that path on the home server after cloning. Do not commit it.
 
 ## Dockge Steps
 
@@ -69,7 +95,8 @@ the home server after cloning. Do not commit it.
 2. Use this repository as the stack folder, or paste the contents of
    `docker-compose.dockge.yml` into Dockge.
 3. Add the `.env.dockge.example` values in Dockge and replace secrets.
-4. Make sure `config/devices.csv` exists if device labels are enabled.
+4. Make sure `${STOREPATH}/DockerStuff/home-net-observer/config/devices.csv`
+   exists if device labels are enabled.
 5. Start the stack.
 6. Open the Web UI:
 

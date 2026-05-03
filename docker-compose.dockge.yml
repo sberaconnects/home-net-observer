@@ -2,6 +2,10 @@ services:
   influxdb:
     image: influxdb:2.7
     container_name: hno-influxdb
+    env_file:
+      - .env
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
     ports:
       - "8086:8086"
@@ -13,14 +17,20 @@ services:
       DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET}
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN}
     volumes:
-      - influxdb-data:/var/lib/influxdb2
-      - influxdb-config:/etc/influxdb2
+      - ${STOREPATH}/DockerStuff/home-net-observer/influxdb/data:/var/lib/influxdb2
+      - ${STOREPATH}/DockerStuff/home-net-observer/influxdb/config:/etc/influxdb2
+    networks:
+      - home_net_observer_bridge
 
   webui:
     build:
       context: .
       dockerfile: webui/Dockerfile
     container_name: hno-webui
+    env_file:
+      - .env
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
     depends_on:
       - influxdb
@@ -33,12 +43,18 @@ services:
       INFLUXDB_TOKEN: ${INFLUXDB_TOKEN}
       INFLUXDB_ORG: ${INFLUXDB_ORG}
       INFLUXDB_BUCKET: ${INFLUXDB_BUCKET}
+    networks:
+      - home_net_observer_bridge
 
   collector:
     build:
       context: .
       dockerfile: collector/Dockerfile
     container_name: hno-collector
+    env_file:
+      - .env
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     restart: unless-stopped
     depends_on:
       - influxdb
@@ -69,8 +85,9 @@ services:
       ADGUARD_POLL_INTERVAL: ${ADGUARD_POLL_INTERVAL}
       ADGUARD_QUERY_LIMIT: ${ADGUARD_QUERY_LIMIT}
     volumes:
-      - ./config:/etc/home-net-observer:ro
+      - ${STOREPATH}/DockerStuff/home-net-observer/config:/etc/home-net-observer:ro
 
-volumes:
-  influxdb-data:
-  influxdb-config:
+networks:
+  home_net_observer_bridge:
+    external: true
+    name: ${DOCKER_NETWORK}
