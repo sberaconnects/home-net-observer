@@ -55,6 +55,14 @@ It reads from InfluxDB and shows:
   domains, and data freshness
 - `Quick Find` search for devices, IP addresses, and domains
 
+Dashboard overview:
+
+![Home Net Observer dashboard](docs/screenshots/dashboard.png)
+
+Device detail view:
+
+![Home Net Observer device detail](docs/screenshots/device-detail.png)
+
 Start it with the central stack:
 
 ```bash
