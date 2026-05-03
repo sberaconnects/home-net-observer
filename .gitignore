@@ -1,0 +1,9 @@
+.env
+.idea/
+.vscode/
+bin/
+dist/
+tmp/
+*.pcap
+*.pcapng
+*.log

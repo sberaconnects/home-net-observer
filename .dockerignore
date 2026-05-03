@@ -1,0 +1,8 @@
+.git
+.env
+bin
+dist
+tmp
+*.pcap
+*.pcapng
+*.log
