@@ -26,6 +26,7 @@ INFLUXDB_PASSWORD=change-this
 INFLUXDB_ORG=home
 INFLUXDB_BUCKET=network
 INFLUXDB_TOKEN=change-this-token
+INFLUXDB_HTTP_PORT=18086
 
 WEBUI_HTTP_PORT=8088
 WEBUI_LAN_PREFIX=192.168.178.
@@ -60,6 +61,11 @@ ip route get 1.1.1.1
 ```
 
 The interface shown after `dev` in the route command is usually the right one.
+
+InfluxDB is exposed on `INFLUXDB_HTTP_PORT` on the home server. The default
+Dockge value is `18086` so it does not conflict with an existing service already
+using `8086`. The Web UI still uses the internal Docker address
+`http://influxdb:8086`.
 
 The compose file follows the same Dockge pattern as your other services:
 
