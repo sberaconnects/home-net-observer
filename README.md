@@ -188,6 +188,7 @@ The overview dashboard includes:
 ├── docker-compose.yml          # InfluxDB, Web UI, Grafana, optional collector
 ├── docker-compose.dockge.yml   # Dockge/home-server deployment
 ├── .env.example                # Example runtime configuration
+├── .env.dockge.example         # Dockge environment template
 ├── Makefile                    # Repeatable local checks
 └── README.md
 ```

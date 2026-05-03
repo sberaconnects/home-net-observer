@@ -12,7 +12,10 @@ Use `docker-compose.dockge.yml` for Dockge.
 
 ## Before Starting
 
-Create or update `.env` beside the compose file. Required values:
+Use `.env.dockge.example` as the Dockge environment template. Copy those values
+into Dockge's environment editor and replace the passwords/tokens.
+
+Required values:
 
 ```text
 INFLUXDB_USERNAME=admin
@@ -46,14 +49,26 @@ ADGUARD_QUERY_LIMIT=500
 Set `COLLECTOR_INTERFACE` to the real interface on the home server, for example
 `eth0`, `enp3s0`, or `wlan0`.
 
+To find the interface on the home server:
+
+```bash
+ip -br addr
+ip route get 1.1.1.1
+```
+
+The interface shown after `dev` in the route command is usually the right one.
+
 Keep `config/devices.csv` beside the compose file if you want friendly names.
+
+If you are deploying from Git, copy your private local `config/devices.csv` to
+the home server after cloning. Do not commit it.
 
 ## Dockge Steps
 
 1. Create a new Dockge stack, for example `home-net-observer`.
-2. Point it at this project folder, or paste the contents of
-   `docker-compose.dockge.yml`.
-3. Add the `.env` values in Dockge.
+2. Use this repository as the stack folder, or paste the contents of
+   `docker-compose.dockge.yml` into Dockge.
+3. Add the `.env.dockge.example` values in Dockge and replace secrets.
 4. Make sure `config/devices.csv` exists if device labels are enabled.
 5. Start the stack.
 6. Open the Web UI:
@@ -61,6 +76,34 @@ Keep `config/devices.csv` beside the compose file if you want friendly names.
 ```text
 http://HOME_SERVER_IP:8088
 ```
+
+## First-Run Checks
+
+After the stack starts, check:
+
+```bash
+docker logs hno-influxdb --tail 50
+docker logs hno-webui --tail 50
+docker logs hno-collector --tail 50
+```
+
+Expected collector logs:
+
+```text
+collector started
+adguard collector started
+```
+
+Then open:
+
+```text
+http://HOME_SERVER_IP:8088/healthz
+http://HOME_SERVER_IP:8088
+```
+
+If InfluxDB was already initialized with different credentials, changing
+`INFLUXDB_TOKEN` in Dockge will not update the existing volume. Either keep the
+original token or recreate the InfluxDB volume.
 
 ## What Website Detail Is Available
 
@@ -114,4 +157,6 @@ block/unblock workflows.
 - Packet capture from a Docker container only sees traffic visible to that host.
   For whole-house packet visibility, run on a gateway, bridge, mirrored switch
   port, or rely mainly on AdGuard DNS logs.
+- Host networking is used for the collector so LAN scan and host-visible packet
+  metadata work better on Linux home servers.
 - Treat `.env`, InfluxDB, and AdGuard data as sensitive household data.
