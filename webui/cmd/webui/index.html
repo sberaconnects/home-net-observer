@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Home Net Observer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080a14;
+      --panel: rgba(16, 22, 41, 0.86);
+      --panel-strong: rgba(24, 31, 56, 0.96);
+      --text: #f8fbff;
+      --muted: #aeb8d6;
+      --line: rgba(151, 170, 230, 0.24);
+      --accent: #18f2c5;
+      --accent-2: #ff4fd8;
+      --accent-3: #ffd166;
+      --danger: #ff5d73;
+      --warn: #ffd166;
+      --glow: rgba(24, 242, 197, 0.28);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(255, 79, 216, 0.18), transparent 34%),
+        radial-gradient(circle at 88% 6%, rgba(24, 242, 197, 0.14), transparent 34%),
+        linear-gradient(135deg, #080a14 0%, #15102f 42%, #081a25 100%);
+      background-attachment: fixed;
+      color: var(--text);
+      font: 14px/1.45 "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(8, 10, 20, 0.78);
+      backdrop-filter: blur(18px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: 0 10px 36px rgba(0, 0, 0, 0.28);
+    }
+    h1 {
+      font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 0;
+      margin: 0;
+      text-transform: uppercase;
+      color: #ffffff;
+      text-shadow: 0 0 16px rgba(24, 242, 197, 0.7), 0 0 34px rgba(255, 79, 216, 0.35);
+    }
+    main { padding: 20px 24px 40px; max-width: 1600px; margin: 0 auto; }
+    button, select, a.action {
+      border: 1px solid var(--line);
+      background: rgba(12, 17, 34, 0.9);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font: inherit;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    button { cursor: pointer; }
+    button.action, a.action {
+      display: inline-block;
+      padding: 5px 8px;
+      font-size: 12px;
+      color: #ffffff;
+      border-color: var(--accent);
+      background: linear-gradient(135deg, #14b8a6, #2563eb 48%, #9333ea);
+      box-shadow: 0 0 18px rgba(37, 99, 235, 0.26);
+      text-decoration: none;
+    }
+    input {
+      border: 1px solid var(--line);
+      background: rgba(12, 17, 34, 0.9);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font: inherit;
+      min-width: 220px;
+    }
+    .toolbar { display: flex; gap: 8px; align-items: center; }
+    .quick-find {
+      position: relative;
+    }
+    .quick-find input {
+      min-width: 280px;
+    }
+    .quick-results {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      width: min(520px, 90vw);
+      max-height: 460px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(8, 10, 20, 0.96);
+      box-shadow: 0 22px 58px rgba(0, 0, 0, 0.48), 0 0 28px rgba(24, 242, 197, 0.12);
+      padding: 10px;
+      z-index: 20;
+    }
+    .quick-results[hidden] {
+      display: none;
+    }
+    .quick-group {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .quick-group h3 {
+      margin: 0;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .quick-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid rgba(151, 170, 230, 0.16);
+      border-radius: 10px;
+      color: var(--text);
+      padding: 8px 10px;
+      text-decoration: none;
+      background: rgba(16, 22, 41, 0.62);
+    }
+    .quick-item:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 18px rgba(24, 242, 197, 0.18);
+    }
+    .quick-item strong {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .quick-item span {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(140px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .metric, section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .metric {
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .metric::after {
+      content: "";
+      position: absolute;
+      inset: auto -20% -42px 18%;
+      height: 70px;
+      background: linear-gradient(90deg, transparent, rgba(24, 242, 197, 0.24), rgba(255, 79, 216, 0.18));
+      transform: skewX(-18deg);
+      pointer-events: none;
+    }
+    button.metric {
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+    }
+    button.metric:hover { border-color: var(--accent); box-shadow: 0 0 28px var(--glow); }
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .metric strong {
+      display: block;
+      font-family: "Arial Black", Impact, system-ui, sans-serif;
+      font-size: 28px;
+      letter-spacing: 0;
+      margin-top: 5px;
+      color: #ffffff;
+      text-shadow: 0 0 20px rgba(24, 242, 197, 0.26);
+    }
+    .traffic-chart {
+      margin-bottom: 16px;
+    }
+    .insights {
+      margin-bottom: 16px;
+    }
+    .insight-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      padding: 14px;
+    }
+    .insight-card {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(4, 8, 18, 0.34);
+      overflow: hidden;
+    }
+    .insight-card h3 {
+      margin: 0;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 900;
+      background: rgba(255, 79, 216, 0.10);
+    }
+    .insight-list {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+    }
+    .insight-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      min-width: 0;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .insight-item strong {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .insight-item span {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .freshness-status {
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .freshness-fresh {
+      color: #07111f;
+      background: #18f2c5;
+    }
+    .freshness-stale {
+      color: #07111f;
+      background: #ffd166;
+    }
+    .freshness-missing {
+      color: #ffffff;
+      background: #ff5d73;
+    }
+    .bars {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+    }
+    .bar-row {
+      display: grid;
+      grid-template-columns: minmax(190px, 260px) minmax(140px, 1fr) 92px;
+      gap: 12px;
+      align-items: center;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      text-align: left;
+      width: 100%;
+    }
+    .bar-row:hover .bar-track { border-color: var(--accent); box-shadow: 0 0 22px var(--glow); }
+    .bar-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .bar-name strong {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #ffffff;
+    }
+    .bar-name span { color: var(--muted); font-size: 12px; }
+    .bar-track {
+      height: 20px;
+      border: 1px solid var(--line);
+      background: rgba(4, 8, 18, 0.72);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      min-width: 2px;
+      display: block;
+      background: linear-gradient(90deg, #18f2c5, #34d399);
+      box-shadow: 0 0 18px currentColor;
+    }
+    .bar-row:nth-child(6n+1) .bar-fill { background: linear-gradient(90deg, #18f2c5, #34d399); }
+    .bar-row:nth-child(6n+2) .bar-fill { background: linear-gradient(90deg, #38bdf8, #2563eb); }
+    .bar-row:nth-child(6n+3) .bar-fill { background: linear-gradient(90deg, #c084fc, #ff4fd8); }
+    .bar-row:nth-child(6n+4) .bar-fill { background: linear-gradient(90deg, #ffd166, #f97316); }
+    .bar-row:nth-child(6n+5) .bar-fill { background: linear-gradient(90deg, #fb7185, #dc2626); }
+    .bar-row:nth-child(6n+6) .bar-fill { background: linear-gradient(90deg, #22d3ee, #06b6d4); }
+    .bar-value {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    body.device-page .summary,
+    body.device-page .traffic-chart,
+    body.device-page .insights,
+    body.device-page .grid {
+      display: none;
+    }
+    body.device-page #deviceDetail {
+      display: block;
+    }
+    section {
+      overflow: hidden;
+      backdrop-filter: blur(12px);
+    }
+    section h2 {
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: 0;
+      margin: 0;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(90deg, rgba(24, 242, 197, 0.18), rgba(255, 79, 216, 0.12), transparent);
+      color: #ffffff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    th, td {
+      text-align: left;
+      padding: 9px 12px;
+      border-bottom: 1px solid rgba(151, 170, 230, 0.14);
+      vertical-align: top;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      background: rgba(4, 8, 18, 0.32);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    tr:hover td { background: rgba(24, 242, 197, 0.08); }
+    tr[data-ip] td:first-child { color: var(--accent); font-weight: 900; }
+    tr.selected td { background: rgba(255, 79, 216, 0.13); }
+    .muted { color: var(--muted); }
+    .danger { color: var(--danger); font-weight: 600; }
+    .pill {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .back-link {
+      display: inline-block;
+      margin: 0 0 16px;
+      color: var(--accent);
+      font-weight: 900;
+      text-decoration: none;
+    }
+    #deviceDetail { margin-bottom: 16px; }
+    .device-hero {
+      display: grid;
+      grid-template-columns: minmax(220px, 1.2fr) repeat(4, minmax(130px, 1fr));
+      gap: 12px;
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      background:
+        radial-gradient(circle at 0% 0%, rgba(24, 242, 197, 0.18), transparent 34%),
+        linear-gradient(135deg, rgba(255, 79, 216, 0.10), rgba(37, 99, 235, 0.12), transparent);
+    }
+    .device-identity {
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(4, 8, 18, 0.34);
+    }
+    .device-identity strong {
+      display: block;
+      overflow: hidden;
+      color: #ffffff;
+      font-family: "Arial Black", Impact, system-ui, sans-serif;
+      font-size: 26px;
+      letter-spacing: 0;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .device-identity span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .device-stat {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(4, 8, 18, 0.34);
+      min-width: 0;
+    }
+    .device-stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .device-stat strong {
+      display: block;
+      color: #ffffff;
+      font-family: "Arial Black", Impact, system-ui, sans-serif;
+      font-size: 22px;
+      letter-spacing: 0;
+      margin-top: 5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .activity-tools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(4, 8, 18, 0.18);
+    }
+    .status-pill {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .status-allowed {
+      color: #07111f;
+      background: #18f2c5;
+    }
+    .status-blocked {
+      color: #ffffff;
+      background: #ff5d73;
+    }
+    .wide-table th:nth-child(1), .wide-table td:nth-child(1) { width: 150px; }
+    .wide-table th:nth-child(3), .wide-table td:nth-child(3) { width: 86px; }
+    .wide-table th:nth-child(4), .wide-table td:nth-child(4) { width: 110px; }
+    .wide-table th:nth-child(5), .wide-table td:nth-child(5) { width: 170px; }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0;
+      border-top: 1px solid var(--line);
+    }
+    .detail-grid > div { min-width: 0; }
+    .detail-grid > div:nth-child(odd) { border-right: 1px solid var(--line); }
+    .detail-grid h3 {
+      font-size: 13px;
+      margin: 0;
+      padding: 10px 12px;
+      background: rgba(4, 8, 18, 0.36);
+      border-bottom: 1px solid var(--line);
+      color: #ffffff;
+    }
+    @media (max-width: 1000px) {
+      .summary, .grid, .insight-grid { grid-template-columns: 1fr; }
+      .device-hero { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 1fr; gap: 6px; }
+      .bar-value { text-align: left; }
+      header { align-items: flex-start; flex-direction: column; }
+      .toolbar { align-items: stretch; flex-direction: column; width: 100%; }
+      .quick-find input { min-width: 0; width: 100%; }
+      .quick-results { left: 0; right: auto; width: 100%; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .detail-grid > div:nth-child(odd) { border-right: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Home Net Observer</h1>
+    <div class="toolbar">
+      <div class="quick-find">
+        <input id="quickFind" type="search" placeholder="Find device, IP, or domain">
+        <div class="quick-results" id="quickResults" hidden></div>
+      </div>
+      <select id="window">
+        <option value="-1h">Last hour</option>
+        <option value="-6h" selected>Last 6 hours</option>
+        <option value="-24h">Last day</option>
+        <option value="-7d">Last week</option>
+      </select>
+      <button id="refresh">Refresh</button>
+    </div>
+  </header>
+
+  <main>
+    <a class="back-link" id="backLink" href="/" hidden>Back to dashboard</a>
+
+    <div class="summary">
+      <button class="metric" id="showDevices" type="button"><span>Devices</span><strong id="devicesCount">-</strong></button>
+      <div class="metric"><span>DNS Queries</span><strong id="dnsQueries">-</strong></div>
+      <div class="metric"><span>Blocked</span><strong id="blockedQueries">-</strong></div>
+      <div class="metric"><span>Block Rate</span><strong id="blockRate">-</strong></div>
+      <div class="metric"><span>Traffic</span><strong id="networkBytes">-</strong></div>
+    </div>
+
+    <section class="traffic-chart">
+      <h2>Traffic By Device</h2>
+      <div class="bars" id="trafficBars"></div>
+    </section>
+
+    <section class="insights">
+      <h2>Needs Review</h2>
+      <div class="insight-grid">
+        <div class="insight-card">
+          <h3>Unknown Devices</h3>
+          <div class="insight-list" id="unknownDevices"></div>
+        </div>
+        <div class="insight-card">
+          <h3>Most Blocked</h3>
+          <div class="insight-list" id="mostBlockedClients"></div>
+        </div>
+        <div class="insight-card">
+          <h3>Noisy Domains</h3>
+          <div class="insight-list" id="noisyDomains"></div>
+        </div>
+        <div class="insight-card">
+          <h3>Data Freshness</h3>
+          <div class="insight-list" id="freshness"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="deviceDetail" hidden>
+      <h2 id="deviceTitle">Device</h2>
+      <div class="device-hero">
+        <div class="device-identity">
+          <strong id="deviceName">-</strong>
+          <span id="deviceMeta">-</span>
+        </div>
+        <div class="device-stat"><span>DNS Queries</span><strong id="deviceDNSQueries">-</strong></div>
+        <div class="device-stat"><span>Blocked</span><strong id="deviceBlockedQueries">-</strong></div>
+        <div class="device-stat"><span>Block Rate</span><strong id="deviceBlockRate">-</strong></div>
+        <div class="device-stat"><span>Traffic</span><strong id="deviceNetworkBytes">-</strong></div>
+      </div>
+      <div>
+        <h3>Website Activity</h3>
+        <div class="activity-tools">
+          <input id="activitySearch" type="search" placeholder="Search domain, reason, rule">
+          <select id="activityStatus">
+            <option value="all">All requests</option>
+            <option value="allowed">Allowed only</option>
+            <option value="blocked">Blocked only</option>
+          </select>
+        </div>
+        <table class="wide-table">
+          <thead><tr><th>Time</th><th>Domain</th><th>Type</th><th>Decision</th><th>Reason</th><th>Rule / Upstream</th></tr></thead>
+          <tbody id="websiteActivity"></tbody>
+        </table>
+      </div>
+      <div class="detail-grid">
+        <div>
+          <h3>Device Domains</h3>
+          <table><thead><tr><th>Domain</th><th>Queries</th></tr></thead><tbody id="deviceDomains"></tbody></table>
+        </div>
+        <div>
+          <h3>Device Blocks</h3>
+          <table><thead><tr><th>Domain</th><th>Reason</th><th>Blocked</th></tr></thead><tbody id="deviceBlocks"></tbody></table>
+        </div>
+        <div>
+          <h3>Traffic Peers</h3>
+          <table><thead><tr><th>Peer</th><th>Protocol</th><th>Bytes</th></tr></thead><tbody id="devicePeers"></tbody></table>
+        </div>
+        <div>
+          <h3>Recent Device Blocks</h3>
+          <table><thead><tr><th>Time</th><th>Domain</th><th>Reason</th></tr></thead><tbody id="deviceRecentBlocks"></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section id="devicesPanel">
+        <h2>Devices</h2>
+        <table><thead><tr><th>IP</th><th>Name</th><th>Kind</th><th>Action</th></tr></thead><tbody id="devices"></tbody></table>
+      </section>
+      <section>
+        <h2>AdGuard Clients</h2>
+        <table><thead><tr><th>IP</th><th>Name</th><th>Queries</th><th>Action</th></tr></thead><tbody id="clients"></tbody></table>
+      </section>
+      <section>
+        <h2>Top Domains</h2>
+        <table><thead><tr><th>Domain</th><th>Queries</th></tr></thead><tbody id="topDomains"></tbody></table>
+      </section>
+      <section>
+        <h2>Blocked Domains</h2>
+        <table><thead><tr><th>Domain</th><th>Reason</th><th>Blocked</th></tr></thead><tbody id="blockedDomains"></tbody></table>
+      </section>
+      <section>
+        <h2>Top Network Talkers</h2>
+        <table><thead><tr><th>IP</th><th>Bytes</th></tr></thead><tbody id="talkers"></tbody></table>
+      </section>
+      <section>
+        <h2>Recent Blocks</h2>
+        <table><thead><tr><th>Time</th><th>Client</th><th>Domain</th><th>Reason</th></tr></thead><tbody id="recentBlocked"></tbody></table>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let selectedDevice = "";
+    let currentDashboard = null;
+    let currentWebsiteActivity = [];
+    $("refresh").addEventListener("click", load);
+    $("window").addEventListener("change", load);
+    $("quickFind").addEventListener("input", renderQuickFind);
+    $("quickFind").addEventListener("focus", renderQuickFind);
+    document.addEventListener("click", event => {
+      if (!event.target.closest(".quick-find")) $("quickResults").hidden = true;
+    });
+    $("showDevices").addEventListener("click", () => $("devicesPanel").scrollIntoView({ behavior: "smooth", block: "start" }));
+    $("activitySearch").addEventListener("input", renderWebsiteActivity);
+    $("activityStatus").addEventListener("change", renderWebsiteActivity);
+
+    function cell(value, cls = "") {
+      return `<td class="${cls}">${escapeHtml(value || "")}</td>`;
+    }
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function number(value) {
+      return new Intl.NumberFormat().format(value || 0);
+    }
+    function bytes(value) {
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      let n = value || 0;
+      let i = 0;
+      while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+      return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+    }
+    function rows(id, data, render) {
+      $(id).innerHTML = data.length ? data.map(render).join("") : `<tr><td colspan="6" class="muted">No data</td></tr>`;
+    }
+    async function load() {
+      const res = await fetch(`/api/dashboard?window=${encodeURIComponent($("window").value)}`);
+      const data = await res.json();
+      currentDashboard = data;
+      $("devicesCount").textContent = number(data.summary.devices);
+      $("dnsQueries").textContent = number(data.summary.dnsQueries);
+      $("blockedQueries").textContent = number(data.summary.blockedQueries);
+      $("blockRate").textContent = `${(data.summary.blockRate || 0).toFixed(1)}%`;
+      $("networkBytes").textContent = bytes(data.summary.networkBytes);
+
+      rows("devices", data.devices, d => `<tr data-ip="${escapeHtml(d.ip)}">${cell(d.ip)}${cell(d.name || d.hostname || "Unknown")}${cell(d.kind)}<td><a class="action" href="${deviceHref(d.ip)}">View</a></td></tr>`);
+      rows("clients", data.clients, d => `<tr data-ip="${escapeHtml(d.ip)}">${cell(d.ip)}${cell(d.name || "Unknown")}${cell(number(d.queries))}<td><a class="action" href="${deviceHref(d.ip)}">View</a></td></tr>`);
+      rows("topDomains", data.topDomains, d => `<tr>${cell(d.domain)}${cell(number(d.queries))}</tr>`);
+      rows("blockedDomains", data.blockedDomains, d => `<tr>${cell(d.domain)}${cell(d.reason)}${cell(number(d.blocked), "danger")}</tr>`);
+      rows("talkers", data.talkers, d => `<tr data-ip="${escapeHtml(d.ip)}">${cell(d.ip)}${cell(bytes(d.bytes))}</tr>`);
+      rows("recentBlocked", data.recentBlocked, d => `<tr>${cell(d.time)}${cell(d.name || d.client)}${cell(d.domain)}${cell(d.reason, "danger")}</tr>`);
+      bars("trafficBars", data.talkers);
+      renderInsights(data.insights || {});
+      renderQuickFind();
+      document.querySelectorAll("tr[data-ip]").forEach(row => row.addEventListener("click", (event) => {
+        if (event.target.tagName !== "A") window.location.href = deviceHref(row.dataset.ip);
+      }));
+      if (selectedDevice) loadDevice(selectedDevice);
+    }
+    function deviceHref(ip) {
+      return `/device?ip=${encodeURIComponent(ip)}&window=${encodeURIComponent($("window").value)}`;
+    }
+    function bars(id, data) {
+      $(id).innerHTML = data.length ? data.map(d => {
+        const label = d.name || d.ip;
+        const meta = [d.ip, d.kind].filter(Boolean).join(" · ");
+        const width = Math.max(0, Math.min(100, d.share || 0));
+        return `<button class="bar-row" type="button" data-ip="${escapeHtml(d.ip)}">
+          <span class="bar-name"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(meta)}</span></span>
+          <span class="bar-track"><span class="bar-fill" style="width:${width}%"></span></span>
+          <span class="bar-value">${escapeHtml(bytes(d.bytes))}</span>
+        </button>`;
+      }).join("") : `<div class="muted">No traffic data</div>`;
+      document.querySelectorAll(".bar-row[data-ip]").forEach(button => button.addEventListener("click", () => window.location.href = deviceHref(button.dataset.ip)));
+    }
+    function insightItems(id, data, render) {
+      $(id).innerHTML = data && data.length ? data.map(render).join("") : `<div class="muted">Nothing to review</div>`;
+    }
+    function renderInsights(insights) {
+      insightItems("unknownDevices", insights.unknownDevices, d => {
+        const label = d.name || d.hostname || d.ip;
+        return `<a class="insight-item" href="${deviceHref(d.ip)}"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(d.kind || "unknown")}</span></a>`;
+      });
+      insightItems("mostBlockedClients", insights.mostBlockedClients, d => {
+        const label = d.name || d.ip;
+        return `<a class="insight-item" href="${deviceHref(d.ip)}"><strong>${escapeHtml(label)}</strong><span>${number(d.blocked)} blocked</span></a>`;
+      });
+      insightItems("noisyDomains", insights.noisyDomains, d => {
+        return `<div class="insight-item"><strong>${escapeHtml(d.domain)}</strong><span>${number(d.queries)} queries</span></div>`;
+      });
+      insightItems("freshness", insights.freshness, d => {
+        const status = d.status || "missing";
+        const label = d.lastSeen ? `${age(d.ageSeconds)} ago` : "no data";
+        return `<div class="insight-item"><strong>${escapeHtml(d.measurement)}</strong><span class="freshness-status freshness-${escapeHtml(status)}">${escapeHtml(label)}</span></div>`;
+      });
+    }
+    function age(seconds) {
+      const n = Number(seconds || 0);
+      if (n < 60) return `${Math.max(0, n)}s`;
+      if (n < 3600) return `${Math.round(n / 60)}m`;
+      if (n < 86400) return `${Math.round(n / 3600)}h`;
+      return `${Math.round(n / 86400)}d`;
+    }
+    function renderQuickFind() {
+      const query = $("quickFind").value.trim().toLowerCase();
+      const box = $("quickResults");
+      if (!query || !currentDashboard || document.body.classList.contains("device-page")) {
+        box.hidden = true;
+        return;
+      }
+
+      const devices = (currentDashboard.devices || [])
+        .filter(d => includesAny(query, [d.ip, d.name, d.hostname, d.kind]))
+        .slice(0, 6);
+      const clients = (currentDashboard.clients || [])
+        .filter(d => includesAny(query, [d.ip, d.name, d.kind]))
+        .slice(0, 6);
+      const domains = [
+        ...(currentDashboard.topDomains || []).map(d => ({...d, label: "queries", danger: false})),
+        ...(currentDashboard.blockedDomains || []).map(d => ({domain: d.domain, queries: d.blocked, label: "blocked", danger: true}))
+      ]
+        .filter(d => includesAny(query, [d.domain]))
+        .slice(0, 10);
+
+      const parts = [];
+      if (devices.length) {
+        parts.push(`<div class="quick-group"><h3>Devices</h3>${devices.map(d => quickDevice(d)).join("")}</div>`);
+      }
+      if (clients.length) {
+        parts.push(`<div class="quick-group"><h3>AdGuard Clients</h3>${clients.map(d => quickDevice(d)).join("")}</div>`);
+      }
+      if (domains.length) {
+        parts.push(`<div class="quick-group"><h3>Domains</h3>${domains.map(d => quickDomain(d)).join("")}</div>`);
+      }
+      box.innerHTML = parts.length ? parts.join("") : `<div class="muted">No matches</div>`;
+      box.hidden = false;
+    }
+    function includesAny(query, values) {
+      return values.filter(Boolean).join(" ").toLowerCase().includes(query);
+    }
+    function quickDevice(d) {
+      const label = d.name || d.hostname || d.ip;
+      const meta = [d.ip, d.kind].filter(Boolean).join(" · ");
+      return `<a class="quick-item" href="${deviceHref(d.ip)}"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(meta)}</span></a>`;
+    }
+    function quickDomain(d) {
+      const cls = d.danger ? "danger" : "";
+      return `<div class="quick-item"><strong>${escapeHtml(d.domain)}</strong><span class="${cls}">${number(d.queries)} ${escapeHtml(d.label)}</span></div>`;
+    }
+    async function loadDevice(ip, scroll = false) {
+      selectedDevice = ip;
+      const res = await fetch(`/api/device?window=${encodeURIComponent($("window").value)}&ip=${encodeURIComponent(ip)}`);
+      const data = await res.json();
+      $("deviceDetail").hidden = false;
+      renderDeviceSummary(data.summary || { ip });
+      document.querySelectorAll("tr[data-ip]").forEach(row => row.classList.toggle("selected", row.dataset.ip === ip));
+      currentWebsiteActivity = data.websiteActivity || [];
+      renderWebsiteActivity();
+      rows("deviceDomains", data.topDomains, d => `<tr>${cell(d.domain)}${cell(number(d.queries))}</tr>`);
+      rows("deviceBlocks", data.blockedDomains, d => `<tr>${cell(d.domain)}${cell(d.reason)}${cell(number(d.blocked), "danger")}</tr>`);
+      rows("devicePeers", data.trafficPeers, d => `<tr>${cell(d.peer)}${cell(d.protocol)}${cell(bytes(d.bytes))}</tr>`);
+      rows("deviceRecentBlocks", data.recentBlocked, d => `<tr>${cell(d.time)}${cell(d.domain)}${cell(d.reason, "danger")}</tr>`);
+      if (scroll) $("deviceDetail").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    function renderDeviceSummary(summary) {
+      const label = summary.name || summary.hostname || summary.ip || selectedDevice;
+      const meta = [summary.ip, summary.kind, summary.hostname, summary.mac, summary.source].filter(Boolean).join(" · ");
+      $("deviceTitle").textContent = `${label} Statistics`;
+      $("deviceName").textContent = label;
+      $("deviceMeta").textContent = meta || summary.ip || selectedDevice;
+      $("deviceDNSQueries").textContent = number(summary.dnsQueries);
+      $("deviceBlockedQueries").textContent = number(summary.blockedQueries);
+      $("deviceBlockRate").textContent = `${(summary.blockRate || 0).toFixed(1)}%`;
+      $("deviceNetworkBytes").textContent = bytes(summary.networkBytes);
+    }
+    function renderWebsiteActivity() {
+      const search = $("activitySearch").value.trim().toLowerCase();
+      const status = $("activityStatus").value;
+      const filtered = currentWebsiteActivity.filter(item => {
+        if (status === "allowed" && item.blocked) return false;
+        if (status === "blocked" && !item.blocked) return false;
+        if (!search) return true;
+        return [item.domain, item.reason, item.rule, item.upstream, item.status]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(search);
+      });
+      rows("websiteActivity", filtered, item => {
+        const decision = item.blocked
+          ? `<span class="status-pill status-blocked">Blocked</span>`
+          : `<span class="status-pill status-allowed">Allowed</span>`;
+        const route = item.blocked ? item.rule : item.upstream;
+        return `<tr>${cell(item.time)}${cell(item.domain)}${cell(item.queryType)}<td>${decision}</td>${cell(item.reason || item.status)}${cell(route || item.status)}</tr>`;
+      });
+    }
+    function boot() {
+      const params = new URLSearchParams(window.location.search);
+      const pathIsDevice = window.location.pathname === "/device";
+      const ip = params.get("ip") || "";
+      const windowParam = params.get("window") || "";
+      if (windowParam) $("window").value = windowParam;
+      if (pathIsDevice && ip) {
+        document.body.classList.add("device-page");
+        $("backLink").hidden = false;
+        selectedDevice = ip;
+        loadDevice(ip);
+        return;
+      }
+      load();
+      setInterval(load, 30000);
+    }
+    boot();
+  </script>
+</body>
+</html>

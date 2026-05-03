@@ -1,0 +1,5 @@
+id,name,kind
+aa:bb:cc:dd:ee:ff,Living room TV,tv
+11:22:33:44:55:66,Work laptop,laptop
+192.168.178.50,Teen phone,phone
+192.168.178.61,AdGuard Home,infrastructure

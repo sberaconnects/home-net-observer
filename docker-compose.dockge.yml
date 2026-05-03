@@ -16,25 +16,23 @@ services:
       - influxdb-data:/var/lib/influxdb2
       - influxdb-config:/etc/influxdb2
 
-  grafana:
-    image: grafana/grafana:11.3.0
-    container_name: hno-grafana
+  webui:
+    build:
+      context: .
+      dockerfile: webui/Dockerfile
+    container_name: hno-webui
     restart: unless-stopped
     depends_on:
       - influxdb
     ports:
-      - "3000:3000"
+      - "${WEBUI_HTTP_PORT}:8080"
     environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
-      INFLUXDB_URL: http://influxdb:8086
+      WEBUI_LISTEN_ADDR: ":8080"
+      WEBUI_INFLUX_URL: http://influxdb:8086
+      WEBUI_LAN_PREFIX: ${WEBUI_LAN_PREFIX}
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN}
       INFLUXDB_ORG: ${INFLUXDB_ORG}
       INFLUXDB_BUCKET: ${INFLUXDB_BUCKET}
-      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN}
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./provisioning/grafana:/etc/grafana/provisioning:ro
-      - ./dashboards:/var/lib/grafana/dashboards:ro
 
   collector:
     build:
@@ -42,10 +40,9 @@ services:
       dockerfile: collector/Dockerfile
     container_name: hno-collector
     restart: unless-stopped
-    profiles:
-      - collector
     depends_on:
       - influxdb
+    network_mode: host
     cap_add:
       - NET_ADMIN
       - NET_RAW
@@ -55,13 +52,13 @@ services:
       COLLECTOR_INTERFACE: ${COLLECTOR_INTERFACE}
       COLLECTOR_PROMISCUOUS: ${COLLECTOR_PROMISCUOUS}
       COLLECTOR_FLUSH_INTERVAL: ${COLLECTOR_FLUSH_INTERVAL}
-      COLLECTOR_INFLUX_URL: ${COLLECTOR_INFLUX_URL}
+      COLLECTOR_INFLUX_URL: http://127.0.0.1:8086
       COLLECTOR_LOG_LEVEL: ${COLLECTOR_LOG_LEVEL}
       COLLECTOR_SCAN_ENABLED: ${COLLECTOR_SCAN_ENABLED}
       COLLECTOR_SCAN_INTERVAL: ${COLLECTOR_SCAN_INTERVAL}
       COLLECTOR_SCAN_CIDR: ${COLLECTOR_SCAN_CIDR}
       COLLECTOR_SCAN_MAX_HOSTS: ${COLLECTOR_SCAN_MAX_HOSTS}
-      COLLECTOR_DEVICE_LABELS: ${COLLECTOR_DEVICE_LABELS}
+      COLLECTOR_DEVICE_LABELS: /etc/home-net-observer/devices.csv
       INFLUXDB_TOKEN: ${INFLUXDB_TOKEN}
       INFLUXDB_ORG: ${INFLUXDB_ORG}
       INFLUXDB_BUCKET: ${INFLUXDB_BUCKET}
@@ -74,25 +71,6 @@ services:
     volumes:
       - ./config:/etc/home-net-observer:ro
 
-  webui:
-    build:
-      context: .
-      dockerfile: webui/Dockerfile
-    container_name: hno-webui
-    restart: unless-stopped
-    depends_on:
-      - influxdb
-    ports:
-      - "${WEBUI_HTTP_PORT}:8080"
-    environment:
-      WEBUI_LISTEN_ADDR: ${WEBUI_LISTEN_ADDR}
-      WEBUI_INFLUX_URL: ${WEBUI_INFLUX_URL}
-      WEBUI_LAN_PREFIX: ${WEBUI_LAN_PREFIX}
-      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN}
-      INFLUXDB_ORG: ${INFLUXDB_ORG}
-      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET}
-
 volumes:
   influxdb-data:
   influxdb-config:
-  grafana-data:

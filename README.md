@@ -2,7 +2,7 @@
 
 Home Net Observer is a metadata-only local network monitor for household
 networks. It captures packet metadata, summarizes traffic, writes measurements
-to InfluxDB, and visualizes the results in Grafana.
+to InfluxDB, and visualizes the results in the built-in Web UI or Grafana.
 
 The first target setup is a Windows PC with Docker Desktop running the central
 InfluxDB/Grafana stack. For full Windows NIC visibility, the collector should
@@ -18,6 +18,8 @@ Collected data:
 
 - source and destination IP address
 - source and destination MAC address when visible
+- active ARP scan responses for devices on the local subnet
+- friendly names from DHCP, local DNS/mDNS-style DNS answers, or manual labels
 - reverse DNS hostname when available
 - DNS query name and query type when visible
 - protocol
@@ -31,16 +33,152 @@ InfluxDB measurements:
 - `device_seen`
 - `traffic_flow`
 - `dns_query`
+- `adguard_query`
+
+## Web UI
+
+The built-in Web UI is the recommended day-to-day view for household monitoring.
+It reads from InfluxDB and shows:
+
+- household devices from `device_seen`
+- AdGuard clients and query counts
+- top requested domains
+- top blocked domains
+- recent blocked requests
+- top network talkers by observed traffic bytes
+- click-through device history for domains, blocks, and traffic peers
+- per-device website activity with allowed/blocked status, AdGuard reason,
+  rule/upstream, and search filters
+- per-device profile header with identity, DNS query count, blocked count, block
+  rate, and observed traffic
+- `Needs Review` insights for unknown devices, most-blocked devices, noisy
+  domains, and data freshness
+- `Quick Find` search for devices, IP addresses, and domains
+
+Start it with the central stack:
+
+```bash
+docker compose up -d influxdb webui
+```
+
+Open:
+
+```text
+http://localhost:8088
+```
+
+The host port is controlled by:
+
+```text
+WEBUI_HTTP_PORT=8088
+```
+
+To keep Docker/internal addresses out of the household view, set your LAN
+prefix:
+
+```text
+WEBUI_LAN_PREFIX=192.168.178.
+```
+
+Leave `WEBUI_LAN_PREFIX` empty if you want to show every IP stored in InfluxDB.
+
+## Naming Devices
+
+Some devices advertise useful names through DHCP or local DNS traffic. The
+collector now listens for those names and writes them into `device_seen` as:
+
+- `name`
+- `source`
+- `kind`
+
+Name sources:
+
+- `manual`: from your local MAC label file
+- `dhcp`: learned from DHCP hostname option when visible
+- `dns`: learned from reverse DNS or local DNS answers when visible
+
+Manual labels are the most reliable way to make the dashboard readable. Labels
+can use either a MAC address or a stable local IP address. Copy the example file
+and edit it with your real devices:
+
+```bash
+cp config/devices.example.csv config/devices.csv
+```
+
+Format:
+
+```csv
+id,name,kind
+aa:bb:cc:dd:ee:ff,Living room TV,tv
+11:22:33:44:55:66,Work laptop,laptop
+192.168.178.51,Teen tablet,tablet
+```
+
+The file is mounted into the collector container at:
+
+```text
+/etc/home-net-observer/devices.csv
+```
+
+Native collector runs can point to a local file:
+
+```powershell
+$env:COLLECTOR_DEVICE_LABELS="C:\path\to\devices.csv"
+```
+
+## AdGuard Home
+
+Your AdGuard Home instance is configured as:
+
+```text
+ADGUARD_BASE_URL=http://192.168.178.61
+```
+
+Use the base URL without the browser `#` fragment. The project will use
+AdGuard's local API under `/control`, such as:
+
+```text
+GET /control/status
+GET /control/querylog
+```
+
+The API requires your AdGuard admin username and password:
+
+```text
+ADGUARD_USERNAME=
+ADGUARD_PASSWORD=
+```
+
+Keep real credentials only in `.env`; do not commit them.
+
+When enabled, the collector polls AdGuard every `ADGUARD_POLL_INTERVAL` and
+writes query-log entries to InfluxDB as `adguard_query`.
+
+Useful query:
+
+```bash
+docker compose exec -T influxdb influx query \
+  --org home \
+  --token change-me-token \
+  'from(bucket:"network") |> range(start:-1h) |> filter(fn:(r)=>r._measurement == "adguard_query") |> limit(n:20)'
+```
+
+The overview dashboard includes:
+
+- `AdGuard DNS Queries`
+- `AdGuard Blocked Domains`
 
 ## Repository Layout
 
 ```text
 .
 ├── collector/                  # Go packet metadata collector
+├── webui/                      # Go household monitoring web interface
 ├── dashboards/                 # Grafana dashboard JSON
 ├── docs/                       # Architecture and roadmap notes
 ├── provisioning/grafana/       # Grafana datasource and dashboard provisioning
-├── docker-compose.yml          # InfluxDB, Grafana, optional collector
+├── docker-compose.yml          # InfluxDB, Web UI, Grafana, optional collector
+├── docker-compose.dockge.yml   # Dockge/home-server deployment
 ├── .env.example                # Example runtime configuration
 ├── Makefile                    # Repeatable local checks
 └── README.md
@@ -73,6 +211,18 @@ From the project root:
 cd /home/sbera/git/personal/home-net-observer
 cp .env.example .env
 docker compose up -d influxdb grafana
+```
+
+For the Web UI:
+
+```bash
+docker compose up -d influxdb webui
+```
+
+Open:
+
+```text
+http://localhost:8088
 ```
 
 Open Grafana:
@@ -139,6 +289,41 @@ docker run --rm home-net-observer-collector:dev -list-interfaces
 On Docker Desktop for Windows, this container sees Docker networking rather than
 the full physical household network. That is expected.
 
+Active LAN scanning is enabled by default, but it cannot run on the `any`
+pseudo-interface. For a real Linux host or Raspberry Pi, set a concrete capture
+interface:
+
+```text
+COLLECTOR_INTERFACE=eth0
+COLLECTOR_SCAN_ENABLED=true
+COLLECTOR_SCAN_INTERVAL=5m
+COLLECTOR_SCAN_CIDR=
+COLLECTOR_SCAN_MAX_HOSTS=1024
+COLLECTOR_DEVICE_LABELS=/etc/home-net-observer/devices.csv
+```
+
+If `COLLECTOR_SCAN_CIDR` is empty, the collector scans the IPv4 subnet assigned
+to the capture interface. You can set it explicitly, for example:
+
+```text
+COLLECTOR_SCAN_CIDR=192.168.1.0/24
+```
+
+To let the Docker collector see the real host NIC on Linux, run it with the
+host-network override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.collector-host.yml --profile collector up -d collector
+```
+
+In host-network mode the collector reaches local InfluxDB through
+`http://127.0.0.1:8086` by default. Override it when sending data to a different
+central server:
+
+```text
+COLLECTOR_HOST_INFLUX_URL=http://CENTRAL_SERVER_IP:8086
+```
+
 ## Run The Collector Natively On Windows
 
 This is the recommended path for testing real traffic from a Windows PC.
@@ -171,6 +356,10 @@ This is the recommended path for testing real traffic from a Windows PC.
    $env:COLLECTOR_INTERFACE="\Device\NPF_{YOUR-INTERFACE-ID}"
    $env:COLLECTOR_INFLUX_URL="http://localhost:8086"
    $env:COLLECTOR_PROMISCUOUS="true"
+   $env:COLLECTOR_SCAN_ENABLED="true"
+   $env:COLLECTOR_SCAN_INTERVAL="5m"
+   $env:COLLECTOR_SCAN_CIDR="192.168.1.0/24"
+   $env:COLLECTOR_DEVICE_LABELS="C:\path\to\devices.csv"
    $env:INFLUXDB_TOKEN="change-me-token"
    $env:INFLUXDB_ORG="home"
    $env:INFLUXDB_BUCKET="network"
@@ -181,12 +370,30 @@ This is the recommended path for testing real traffic from a Windows PC.
 
 7. Refresh Grafana.
 
+## Device Inventory And Drill-Down
+
+The overview dashboard contains a `Devices Seen` table. Devices arrive from two
+sources:
+
+- passive traffic observed by the collector
+- active ARP scans of the local subnet
+
+Click a row in the `Devices Seen` table to open the device detail dashboard.
+The detail dashboard is filtered by `device_ip` and shows:
+
+- traffic rate involving that device
+- top conversations by source IP, destination IP, and protocol
+- DNS queries from that device when DNS packets are visible
+- latest known IP, MAC, friendly name, hostname, kind, source, and collector
+
+Grafana provisions both dashboards automatically from `dashboards/`.
+
 ## Central Home Server Mode
 
 Run the storage and dashboard stack on one central machine:
 
 ```bash
-docker compose up -d influxdb grafana
+docker compose up -d influxdb webui grafana
 ```
 
 On each collector device, point to the central server:
@@ -200,6 +407,32 @@ COLLECTOR_NAME=living-room-pc
 ```
 
 Then run the collector natively or in Docker depending on the host.
+
+## Dockge Home Server Mode
+
+For Dockge, use the dedicated compose file:
+
+```text
+docker-compose.dockge.yml
+```
+
+It runs:
+
+- InfluxDB
+- Web UI
+- collector with host networking for LAN visibility
+
+Deployment notes are in:
+
+```text
+docs/DOCKGE.md
+```
+
+Open the Web UI from another device on the home network:
+
+```text
+http://HOME_SERVER_IP:8088
+```
 
 ## Test Plan
 
@@ -253,6 +486,7 @@ The current unit test verifies:
 - synthetic DNS packets produce `dns_query` metadata
 - observed packets produce `device_seen` metadata
 - flushed packet summaries produce `traffic_flow` metadata
+- scan helper logic limits active scans to safe local ranges
 
 ### 4. Start The Stack
 
@@ -290,6 +524,32 @@ http://localhost:3000
 ```
 
 Look for the `Home Net Observer` dashboard under the `Home Network` folder.
+
+### 5b. Check The Web UI
+
+Start the Web UI:
+
+```bash
+docker compose up -d webui
+```
+
+Check health:
+
+```bash
+curl http://localhost:8088/healthz
+```
+
+Expected result:
+
+```text
+ok
+```
+
+Open:
+
+```text
+http://localhost:8088
+```
 
 ### 6. Start Collector
 
@@ -364,6 +624,8 @@ Passing checks:
 - InfluxDB starts and initializes org `home` and bucket `network`.
 - Grafana starts and provisions the InfluxDB datasource.
 - Grafana provisions the `Home Net Observer` dashboard.
+- Web UI starts on `http://localhost:8088`.
+- Web UI API returns LAN-filtered dashboard data from InfluxDB.
 - Collector Docker image builds successfully.
 - Collector starts with interface `any`.
 - Collector writes `device_seen` data to InfluxDB.
@@ -375,6 +637,33 @@ Known limitation from this Docker smoke test:
 - DNS packets were not visible from the Docker collector interface in this
   environment. This is expected in some Docker setups and should be tested with
   native Windows/Npcap or a host/gateway capture point.
+
+## Testing Multiple Devices
+
+For actual household device discovery, test on a host that can access the real
+LAN interface.
+
+On Windows:
+
+1. Run InfluxDB and Grafana with Docker Desktop.
+2. Run the collector natively with Npcap.
+3. Set `COLLECTOR_INTERFACE` to the real Wi-Fi or Ethernet Npcap interface.
+4. Set `COLLECTOR_SCAN_CIDR` to your home subnet, such as `192.168.1.0/24`.
+5. Wait one scan interval or restart the collector to scan immediately.
+6. Open the `Home Net Observer` dashboard.
+7. Click a device in `Devices Seen` to open its history.
+
+On Linux or Raspberry Pi:
+
+```bash
+COLLECTOR_INTERFACE=eth0
+COLLECTOR_SCAN_ENABLED=true
+COLLECTOR_SCAN_CIDR=192.168.1.0/24
+docker compose -f docker-compose.yml -f docker-compose.collector-host.yml --profile collector up -d collector
+```
+
+The collector sends ARP probes only inside the configured subnet and caps scan
+size with `COLLECTOR_SCAN_MAX_HOSTS`.
 
 ## Common Commands
 
@@ -478,6 +767,9 @@ bridge, Raspberry Pi bridge, or mirrored switch port.
 
 ## Roadmap
 
+- AdGuard Home query-log ingestion for household-wide monitoring and blocking.
+- Dockge-ready home-server deployment with AdGuard Home, InfluxDB, Grafana, and
+  Home Net Observer.
 - Native Windows binary packaging.
 - Better hostname enrichment from mDNS, DHCP leases, and NetBIOS.
 - Device labels.

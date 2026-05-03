@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -12,6 +14,36 @@ import (
 
 type fakeWriter struct {
 	points []*write.Point
+}
+
+func TestHostsInNetworkLimitsScanRange(t *testing.T) {
+	_, network, err := net.ParseCIDR("192.168.1.0/24")
+	if err != nil {
+		t.Fatalf("failed to parse cidr: %v", err)
+	}
+
+	hosts := hostsInNetwork(network, 3)
+	if len(hosts) != 3 {
+		t.Fatalf("expected 3 hosts, got %d", len(hosts))
+	}
+	if hosts[0].String() != "192.168.1.1" {
+		t.Fatalf("expected first host 192.168.1.1, got %s", hosts[0])
+	}
+	if hosts[2].String() != "192.168.1.3" {
+		t.Fatalf("expected third host 192.168.1.3, got %s", hosts[2])
+	}
+}
+
+func TestHostsInNetworkSkipsVeryLargeRanges(t *testing.T) {
+	_, network, err := net.ParseCIDR("10.0.0.0/8")
+	if err != nil {
+		t.Fatalf("failed to parse cidr: %v", err)
+	}
+
+	hosts := hostsInNetwork(network, 1024)
+	if len(hosts) != 0 {
+		t.Fatalf("expected large range to be skipped, got %d hosts", len(hosts))
+	}
 }
 
 func (w *fakeWriter) WritePoint(_ context.Context, points ...*write.Point) error {
@@ -27,6 +59,9 @@ func TestObservePacketWritesDNSQueryMetadata(t *testing.T) {
 		},
 		writeAPI:        writer,
 		hostCache:       map[string]string{},
+		labelsByMAC:     map[string]deviceLabel{},
+		labelsByIP:      map[string]deviceLabel{},
+		namesByMAC:      map[string]string{},
 		deviceSeenCache: map[string]time.Time{},
 		flowBuffer:      map[flowKey]flowStats{},
 	}
@@ -66,6 +101,162 @@ func TestObservePacketWritesDNSQueryMetadata(t *testing.T) {
 	}
 	if !foundFlow {
 		t.Fatalf("expected traffic_flow point after flush, got %#v", writer.points)
+	}
+}
+
+func TestEnrichDeviceUsesManualLabelBeforeLearnedNames(t *testing.T) {
+	app := &collector{
+		hostCache: map[string]string{},
+		labelsByMAC: map[string]deviceLabel{
+			"aa:bb:cc:dd:ee:ff": {name: "Living room TV", kind: "tv"},
+		},
+		namesByMAC: map[string]string{
+			"aa:bb:cc:dd:ee:ff": "dhcp-tv",
+		},
+	}
+
+	device := app.enrichDevice(device{mac: "AA-BB-CC-DD-EE-FF", ip: "192.168.1.20"})
+
+	if device.name != "Living room TV" {
+		t.Fatalf("expected manual label, got %q", device.name)
+	}
+	if device.source != "manual" {
+		t.Fatalf("expected manual source, got %q", device.source)
+	}
+	if device.kind != "tv" {
+		t.Fatalf("expected tv kind, got %q", device.kind)
+	}
+}
+
+func TestEnrichDeviceUsesIPLabel(t *testing.T) {
+	app := &collector{
+		hostCache:   map[string]string{},
+		labelsByMAC: map[string]deviceLabel{},
+		labelsByIP: map[string]deviceLabel{
+			"192.168.178.50": {name: "Teen phone", kind: "phone"},
+		},
+		namesByMAC: map[string]string{},
+	}
+
+	device := app.enrichDevice(device{ip: "192.168.178.50"})
+
+	if device.name != "Teen phone" {
+		t.Fatalf("expected IP label, got %q", device.name)
+	}
+	if device.source != "manual" {
+		t.Fatalf("expected manual source, got %q", device.source)
+	}
+}
+
+func TestLearnDHCPNameMapsMACAndIP(t *testing.T) {
+	app := &collector{
+		hostCache:  map[string]string{},
+		namesByMAC: map[string]string{},
+	}
+	dhcp := &layers.DHCPv4{
+		ClientIP:     net.IPv4(192, 168, 1, 25),
+		ClientHWAddr: net.HardwareAddr{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff},
+		Options: layers.DHCPOptions{
+			layers.NewDHCPOption(layers.DHCPOptHostname, []byte("work-laptop")),
+		},
+	}
+
+	app.learnDHCPName(device{}, dhcp)
+
+	if app.namesByMAC["aa:bb:cc:dd:ee:ff"] != "work-laptop" {
+		t.Fatalf("expected DHCP name by MAC, got %#v", app.namesByMAC)
+	}
+	if app.hostCache["192.168.1.25"] != "work-laptop" {
+		t.Fatalf("expected DHCP name by IP, got %#v", app.hostCache)
+	}
+}
+
+func TestLoadDeviceLabelsSupportsIPAndMAC(t *testing.T) {
+	path := tempDeviceLabels(t, `id,name,kind
+aa:bb:cc:dd:ee:ff,Living room TV,tv
+192.168.178.50,Teen phone,phone
+`)
+	labels, err := loadDeviceLabels(path)
+	if err != nil {
+		t.Fatalf("failed to load labels: %v", err)
+	}
+
+	if labels.byMAC["aa:bb:cc:dd:ee:ff"].name != "Living room TV" {
+		t.Fatalf("expected MAC label, got %#v", labels.byMAC)
+	}
+	if labels.byIP["192.168.178.50"].name != "Teen phone" {
+		t.Fatalf("expected IP label, got %#v", labels.byIP)
+	}
+}
+
+func TestPublishManualDeviceLabelsWritesDeviceSeen(t *testing.T) {
+	writer := &fakeWriter{}
+	app := &collector{
+		writeAPI: writer,
+		labelsByIP: map[string]deviceLabel{
+			"192.168.178.51": {name: "Teen tablet", kind: "tablet"},
+		},
+		labelsByMAC:     map[string]deviceLabel{},
+		deviceSeenCache: map[string]time.Time{},
+	}
+
+	app.publishManualDeviceLabels(context.Background())
+
+	found := false
+	for _, point := range writer.points {
+		if point.Name() == "device_seen" && tagValue(point, "ip") == "192.168.178.51" && tagValue(point, "name") == "Teen tablet" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected manual device_seen point, got %#v", writer.points)
+	}
+}
+
+func mustGetwd(t *testing.T) string {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	return wd
+}
+
+func tempDeviceLabels(t *testing.T, content string) string {
+	t.Helper()
+	path := t.TempDir() + "/devices.csv"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("failed to write temp device labels: %v", err)
+	}
+	return path
+}
+
+func TestAdGuardBlockedReasonDetection(t *testing.T) {
+	allowed := adguardQuery{Reason: "NotFilteredNotFound"}
+	if isAdGuardBlocked(allowed) {
+		t.Fatal("expected NotFilteredNotFound to be allowed")
+	}
+
+	blocked := adguardQuery{Reason: "FilteredBlackList"}
+	if !isAdGuardBlocked(blocked) {
+		t.Fatal("expected FilteredBlackList to be blocked")
+	}
+}
+
+func TestAdGuardQueryKeyIncludesStableFields(t *testing.T) {
+	query := adguardQuery{
+		Client: "192.168.178.20",
+		Reason: "FilteredBlackList",
+		Time:   time.Date(2026, 5, 3, 7, 34, 0, 0, time.UTC),
+	}
+	query.Question.Name = "example.com"
+	query.Question.Type = "A"
+
+	key := adguardQueryKey(query)
+	expected := "2026-05-03T07:34:00Z|192.168.178.20|example.com|A|FilteredBlackList"
+	if key != expected {
+		t.Fatalf("expected %q, got %q", expected, key)
 	}
 }
 

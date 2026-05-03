@@ -6,3 +6,5 @@ tmp
 *.pcap
 *.pcapng
 *.log
+*.csv
+!*.example.csv

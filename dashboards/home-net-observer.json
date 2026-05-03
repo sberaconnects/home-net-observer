@@ -93,7 +93,15 @@
         "uid": "home-network-influxdb"
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "links": [
+            {
+              "targetBlank": false,
+              "title": "Open device history",
+              "url": "/d/home-net-observer-device/home-net-observer-device?orgId=1&var-device_ip=${__data.fields.ip}"
+            }
+          ]
+        },
         "overrides": []
       },
       "gridPos": {
@@ -105,11 +113,94 @@
       "id": 4,
       "targets": [
         {
-          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"device_seen\" and r._field == \"seen\")\n  |> group(columns: [\"ip\", \"mac\", \"hostname\"])\n  |> last()",
+          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"device_seen\" and r._field == \"seen\")\n  |> group(columns: [\"ip\", \"mac\", \"name\", \"hostname\", \"kind\", \"source\"])\n  |> last()",
           "refId": "A"
         }
       ],
       "title": "Devices Seen",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-network-influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "targets": [
+        {
+          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"adguard_query\" and r._field == \"count\")\n  |> group(columns: [\"client_ip\", \"client_name\", \"domain\", \"blocked\", \"reason\"])\n  |> sum()\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 50)",
+          "refId": "A"
+        }
+      ],
+      "title": "AdGuard DNS Queries",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-network-influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "targets": [
+        {
+          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"adguard_query\" and r._field == \"count\")\n  |> filter(fn: (r) => r.blocked == \"true\")\n  |> group(columns: [\"client_ip\", \"client_name\", \"domain\", \"reason\", \"rule\"])\n  |> sum()\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 50)",
+          "refId": "A"
+        }
+      ],
+      "title": "AdGuard Blocked Domains",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-network-influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "links": [
+            {
+              "targetBlank": false,
+              "title": "Open device history",
+              "url": "/d/home-net-observer-device/home-net-observer-device?orgId=1&var-device_ip=${__data.fields.client_ip}"
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 7,
+      "targets": [
+        {
+          "query": "from(bucket: \"network\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"adguard_query\" and r._field == \"count\")\n  |> group(columns: [\"client_ip\", \"client_name\"])\n  |> count()\n  |> sort(columns: [\"_value\"], desc: true)",
+          "refId": "A"
+        }
+      ],
+      "title": "AdGuard Clients",
       "type": "table"
     }
   ],

@@ -1,0 +1,5 @@
+services:
+  collector:
+    network_mode: host
+    environment:
+      COLLECTOR_INFLUX_URL: ${COLLECTOR_HOST_INFLUX_URL:-http://127.0.0.1:8086}

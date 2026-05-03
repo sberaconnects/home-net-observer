@@ -20,6 +20,7 @@ It extracts metadata only:
 - reverse DNS hostnames when available
 - DNS query names and query types
 - protocol, byte count, and packet count
+- active ARP scan responses for local subnet device discovery
 
 The collector writes directly to InfluxDB 2.x.
 
@@ -39,8 +40,10 @@ Measurements:
 Grafana is provisioned with:
 
 - an InfluxDB datasource
-- a starter dashboard
+- a starter overview dashboard
+- a device detail dashboard
 - panels for traffic rate, top DNS queries, source IPs, and devices seen
+- drill-down links from device rows to device history and traffic
 
 ## Deployment Modes
 
