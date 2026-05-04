@@ -10,6 +10,16 @@ home-server shape is:
 
 Use `docker-compose.dockge.yml` for Dockge.
 
+The Dockge compose pulls prebuilt images from GitHub Container Registry:
+
+```text
+ghcr.io/sberaconnects/home-net-observer-webui:latest
+ghcr.io/sberaconnects/home-net-observer-collector:latest
+```
+
+Those images are built by GitHub Actions whenever changes are pushed to `main`.
+InfluxDB still uses the official `influxdb:2.7` image.
+
 ## Before Starting
 
 Use `.env.dockge.example` as the Dockge environment template. Copy those values
@@ -98,8 +108,8 @@ that path on the home server after cloning. Do not commit it.
 ## Dockge Steps
 
 1. Create a new Dockge stack, for example `home-net-observer`.
-2. Use this repository as the stack folder, or paste the contents of
-   `docker-compose.dockge.yml` into Dockge.
+2. Paste the contents of `docker-compose.dockge.yml` into Dockge, or use this
+   repository as the stack folder.
 3. Add the `.env.dockge.example` values in Dockge and replace secrets.
 4. Make sure `${STOREPATH}/DockerStuff/home-net-observer/config/devices.csv`
    exists if device labels are enabled.
@@ -137,6 +147,22 @@ http://HOME_SERVER_IP:8088
 If InfluxDB was already initialized with different credentials, changing
 `INFLUXDB_TOKEN` in Dockge will not update the existing volume. Either keep the
 original token or recreate the InfluxDB volume.
+
+## Image Publishing
+
+The image workflow is in `.github/workflows/publish-images.yml`. It publishes:
+
+```text
+ghcr.io/sberaconnects/home-net-observer-webui:latest
+ghcr.io/sberaconnects/home-net-observer-collector:latest
+```
+
+It also publishes immutable `sha-...` tags for each commit and `v...` tags when
+you push a version tag.
+
+After the first workflow run, check GitHub's package page if Dockge cannot pull
+the images. GitHub Container Registry packages sometimes need their visibility
+set to public the first time.
 
 ## What Website Detail Is Available
 

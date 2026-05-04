@@ -23,9 +23,7 @@ services:
       - home_net_observer_bridge
 
   webui:
-    build:
-      context: .
-      dockerfile: webui/Dockerfile
+    image: ghcr.io/sberaconnects/home-net-observer-webui:latest
     container_name: hno-webui
     env_file:
       - .env
@@ -47,9 +45,7 @@ services:
       - home_net_observer_bridge
 
   collector:
-    build:
-      context: .
-      dockerfile: collector/Dockerfile
+    image: ghcr.io/sberaconnects/home-net-observer-collector:latest
     container_name: hno-collector
     env_file:
       - .env
